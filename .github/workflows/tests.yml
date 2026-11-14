@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Aligned with package.json engines and @earendil-works/pi-coding-agent@1.5.2 (>= 22.19.0).
+          node-version: '22.19.0'
+      # Node 22+ reads `node --test tests/` as one file name, not a directory, so the tests are
+      # named by glob (Node expands it itself, the same on both shells).
+      - run: node src/role-contract.mjs
+      - run: node --test "tests/scenarios/*.scenario.mjs"
+      - run: node --test --test-concurrency=4 "tests/**/*.test.mjs"

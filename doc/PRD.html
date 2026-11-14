@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>specialist-subagents PRD 图解</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1f1f1f; --muted: #6b6b6b; --line: #c9c5bc;
+    --box: #ffffff; --soft: #f1eee7;
+    --role: #e8eef8; --expert: #e7f4ea; --record: #fbf1dc; --lead: #f3e8f6;
+    --bad: #c0392b; --badsoft: #fbe4e1; --good: #2e7d4f; --goodsoft: #e2f2e7;
+    --warn: #b7791f; --warnsoft: #fdf1dc; --blue: #2c5aa0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --fg: #e8e6e1; --muted: #9a978f; --line: #4a4a48;
+      --box: #202124; --soft: #26272a;
+      --role: #1f2a3a; --expert: #1d3326; --record: #3a3020; --lead: #33263a;
+      --bad: #ef6f5e; --badsoft: #3a2220; --good: #6cc48b; --goodsoft: #1d3326;
+      --warn: #e0a84a; --warnsoft: #3a3020; --blue: #7aa7e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.65 system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h2 { font-size: 20px; margin: 48px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 20px 0 6px; }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); }
+  .src { color: var(--muted); font-size: 13px; }
+  code { font: 13px/1.4 ui-monospace, Consolas, monospace; background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  svg { width: 100%; height: auto; display: block; margin: 10px 0; }
+  svg text { fill: var(--fg); font-family: system-ui, "Microsoft YaHei", sans-serif; }
+  svg .m { fill: var(--muted); }
+  svg .bad { fill: var(--bad); }
+  svg .good { fill: var(--good); }
+  svg .box { fill: var(--box); stroke: var(--line); }
+  svg .role { fill: var(--role); stroke: var(--line); }
+  svg .expert { fill: var(--expert); stroke: var(--line); }
+  svg .record { fill: var(--record); stroke: var(--line); }
+  svg .lead { fill: var(--lead); stroke: var(--line); }
+  svg .badbox { fill: var(--badsoft); stroke: var(--bad); }
+  svg .goodbox { fill: var(--goodsoft); stroke: var(--good); }
+  svg .warnbox { fill: var(--warnsoft); stroke: var(--warn); }
+  svg .ln { stroke: var(--line); stroke-width: 1.6; fill: none; }
+  svg .lnfg { stroke: var(--fg); stroke-width: 1.6; fill: none; }
+  svg .lnbad { stroke: var(--bad); stroke-width: 1.8; fill: none; }
+  svg .lngood { stroke: var(--good); stroke-width: 1.8; fill: none; }
+  svg .dash { stroke-dasharray: 5 4; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .rules { counter-reset: r; list-style: none; padding: 0; margin: 8px 0; }
+  .rules li { counter-increment: r; padding: 8px 10px 8px 40px; position: relative; border-left: 3px solid var(--line); margin: 6px 0; background: var(--box); }
+  .rules li::before { content: counter(r); position: absolute; left: 12px; top: 8px; font-weight: 700; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+  .chip { border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; font-size: 13px; background: var(--box); }
+  .chip b { font-family: ui-monospace, Consolas, monospace; margin-right: 4px; }
+  .chip.t-old { border-left: 5px solid var(--blue); }
+  .chip.t-new { border-left: 5px solid var(--warn); }
+  .chip.t-ledger { border-left: 5px solid var(--good); }
+  .chip.t-text { border-left: 5px solid var(--muted); }
+  .chip.t-host { border-left: 5px solid #8e5bb5; }
+  .chip.t-cond { border-left: 5px dotted var(--muted); opacity: .75; }
+  .legend span { display: inline-block; margin-right: 14px; font-size: 13px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 4px; }
+  .holes { list-style: none; padding: 0; }
+  .holes li { border: 1px solid var(--warn); background: var(--warnsoft); padding: 10px 12px; margin: 8px 0; }
+  .holes li b { display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td, th { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  nav a { color: inherit; margin-right: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>specialist-subagents PRD 图解</h1>
+<p class="muted">2026-10-10 起草，和 <code>doc/PRD.md</code> 是同一份内容的图版本；两者冲突时以 <code>PRD.md</code> 为准。每张图下面写着它对应 PRD 的哪一节、哪几条需求。</p>
+<nav>
+  <a href="#rules">0 用法</a><a href="#bio">1 仿生</a><a href="#org">2 组织</a><a href="#model">3 概念</a>
+  <a href="#load">4 装载</a><a href="#ctx">5 上下文</a><a href="#life">6 生命周期</a><a href="#merge">7 合并</a>
+  <a href="#learn">8 学习</a><a href="#gov">9 治理</a><a href="#phase">10 顺序</a><a href="#map">11 需求地图</a><a href="#holes">12 画不出来的地方</a>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="rules">0. 这份文件怎么用</h2>
+<p class="src">PRD 第 0 节</p>
+
+<svg viewBox="0 0 1000 250" role="img" aria-label="需求只有两种状态">
+  <rect x="20" y="30" width="200" height="60" rx="6" class="box"/>
+  <text x="120" y="56" text-anchor="middle" font-size="15">PRD 里的一条需求</text>
+  <text x="120" y="77" text-anchor="middle" font-size="12" class="m">编号 · 为什么 · 可执行的验收</text>
+  <line x1="220" y1="60" x2="330" y2="60" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="330" y="30" width="200" height="60" rx="6" class="box"/>
+  <text x="430" y="56" text-anchor="middle" font-size="15">测试名带 [编号]</text>
+  <text x="430" y="77" text-anchor="middle" font-size="12" class="m">或一条台账查询</text>
+  <line x1="530" y1="60" x2="620" y2="60" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="620" y="30" width="170" height="60" rx="6" class="box"/>
+  <text x="705" y="56" text-anchor="middle" font-size="14">prd-check.mjs</text>
+  <text x="705" y="77" text-anchor="middle" font-size="12" class="m">逐条跑验收</text>
+  <line x1="790" y1="50" x2="850" y2="30" class="lngood" marker-end="url(#a1g)"/>
+  <line x1="790" y1="70" x2="850" y2="92" class="lnbad" marker-end="url(#a1b)"/>
+  <rect x="852" y="10" width="130" height="38" rx="6" class="goodbox"/>
+  <text x="917" y="34" text-anchor="middle" font-size="14" class="good">已实现</text>
+  <rect x="852" y="74" width="130" height="38" rx="6" class="badbox"/>
+  <text x="917" y="98" text-anchor="middle" font-size="14" class="bad">未实现</text>
+
+  <text x="20" y="150" font-size="14">不存在的第三种状态（实现者无权把需求放进这里）：</text>
+  <g font-size="14">
+    <rect x="20" y="165" width="140" height="40" rx="6" class="badbox"/>
+    <text x="90" y="190" text-anchor="middle" class="bad">暂时不做</text>
+    <rect x="180" y="165" width="140" height="40" rx="6" class="badbox"/>
+    <text x="250" y="190" text-anchor="middle" class="bad">先停掉</text>
+    <rect x="340" y="165" width="140" height="40" rx="6" class="badbox"/>
+    <text x="410" y="190" text-anchor="middle" class="bad">这次不碰</text>
+    <rect x="500" y="165" width="160" height="40" rx="6" class="badbox"/>
+    <text x="580" y="190" text-anchor="middle" class="bad">"做完了"（自述）</text>
+    <line x1="20" y1="185" x2="660" y2="185" stroke="var(--bad)" stroke-width="2"/>
+  </g>
+  <text x="680" y="180" font-size="13" class="m">要改范围：只有「マスター」，</text>
+  <text x="680" y="198" font-size="13" class="m">改在 PRD 那一条上，写日期和原话</text>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--fg)"/></marker>
+    <marker id="a1g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--good)"/></marker>
+    <marker id="a1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+    <marker id="a1m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/></marker>
+  </defs>
+</svg>
+<ol class="rules">
+  <li>需求只有已实现、未实现两种状态，状态只由 <code>prd-check</code> 给。</li>
+  <li>实现的人无权删除、暂停、推迟、缩小需求；前提没立住就先做前提，依赖写成顺序。</li>
+  <li>只有「マスター」能改范围；没有"暂时不做"这个类别。</li>
+  <li>先改 PRD，再改代码；冲突时以 PRD 为准。</li>
+  <li>写不出可执行验收的，不进需求表，回"还在讨论的"。</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="bio">1. 仿生：拿人类组织映射 AI</h2>
+<p class="src">PRD 第 1、3 节。左边是人类组织里已经解决过的东西，右边是本服务里对应的东西；最下面三条是有意偏离的地方。</p>
+
+<svg viewBox="0 0 1000 470" role="img" aria-label="仿生映射">
+  <text x="190" y="24" text-anchor="middle" font-size="15" font-weight="700">人类组织</text>
+  <text x="810" y="24" text-anchor="middle" font-size="15" font-weight="700">AI 组织（本服务）</text>
+  <g font-size="14">
+    <rect x="60" y="40" width="260" height="34" rx="5" class="box"/><text x="190" y="62" text-anchor="middle">甲方 / 老板</text>
+    <rect x="680" y="40" width="260" height="34" rx="5" class="lead"/><text x="810" y="62" text-anchor="middle">「マスター」</text>
+    <rect x="60" y="84" width="260" height="34" rx="5" class="box"/><text x="190" y="106" text-anchor="middle">经理：派活、签收</text>
+    <rect x="680" y="84" width="260" height="34" rx="5" class="lead"/><text x="810" y="106" text-anchor="middle">组长（主模型）</text>
+    <rect x="60" y="128" width="260" height="34" rx="5" class="box"/><text x="190" y="150" text-anchor="middle">工种 / 岗位</text>
+    <rect x="680" y="128" width="260" height="34" rx="5" class="role"/><text x="810" y="150" text-anchor="middle">角色（岗位墙上的一张脸）</text>
+    <rect x="60" y="172" width="260" height="34" rx="5" class="box"/><text x="190" y="194" text-anchor="middle">在岗的老员工</text>
+    <rect x="680" y="172" width="260" height="34" rx="5" class="expert"/><text x="810" y="194" text-anchor="middle">专家（角色 × 对象）</text>
+    <rect x="60" y="216" width="260" height="34" rx="5" class="box"/><text x="190" y="238" text-anchor="middle">工作日志、档案柜</text>
+    <rect x="680" y="216" width="260" height="34" rx="5" class="record"/><text x="810" y="238" text-anchor="middle">记录（原文一律留盘）</text>
+    <rect x="60" y="260" width="260" height="34" rx="5" class="box"/><text x="190" y="282" text-anchor="middle">离职 / 调岗交接文档</text>
+    <rect x="680" y="260" width="260" height="34" rx="5" class="record"/><text x="810" y="282" text-anchor="middle">交接</text>
+    <rect x="60" y="304" width="260" height="34" rx="5" class="box"/><text x="190" y="326" text-anchor="middle">花名册：谁懂什么</text>
+    <rect x="680" y="304" width="260" height="34" rx="5" class="box"/><text x="810" y="326" text-anchor="middle">名录（名字写清懂什么）</text>
+    <rect x="60" y="348" width="260" height="34" rx="5" class="box"/><text x="190" y="370" text-anchor="middle">外包临时工</text>
+    <rect x="680" y="348" width="260" height="34" rx="5" class="badbox"/><text x="810" y="370" text-anchor="middle" class="bad">临时工 = 缺陷（C-6 统计）</text>
+  </g>
+  <g>
+    <line x1="320" y1="57" x2="680" y2="57" class="ln"/>
+    <line x1="320" y1="101" x2="680" y2="101" class="ln"/>
+    <line x1="320" y1="145" x2="680" y2="145" class="ln"/>
+    <line x1="320" y1="189" x2="680" y2="189" class="ln"/>
+    <line x1="320" y1="233" x2="680" y2="233" class="ln"/>
+    <line x1="320" y1="277" x2="680" y2="277" class="ln"/>
+    <line x1="320" y1="321" x2="680" y2="321" class="ln"/>
+    <line x1="320" y1="365" x2="680" y2="365" class="ln"/>
+  </g>
+  <text x="500" y="181" text-anchor="middle" font-size="12" class="m">任务来来去去，岗位一直在</text>
+  <g font-size="13">
+    <rect x="60" y="400" width="280" height="56" rx="5" class="warnbox"/>
+    <text x="200" y="422" text-anchor="middle">偏离 1：AI 能分身</text>
+    <text x="200" y="442" text-anchor="middle" class="m">专家忙时开分身，不排队（C-3）</text>
+    <rect x="360" y="400" width="280" height="56" rx="5" class="warnbox"/>
+    <text x="500" y="422" text-anchor="middle">偏离 2：AI 读得极快</text>
+    <text x="500" y="442" text-anchor="middle" class="m">现场读原文，不靠记性（C-5）</text>
+    <rect x="660" y="400" width="280" height="56" rx="5" class="warnbox"/>
+    <text x="800" y="422" text-anchor="middle">偏离 3：没有私心，不累</text>
+    <text x="800" y="442" text-anchor="middle" class="m">不需要激励、防扯皮机制</text>
+  </g>
+</svg>
+
+<h3>"问专家"为什么便宜</h3>
+<p class="src">PRD 第 1、3 节；B-1。同一个问题，两条路要付的上下文。</p>
+<svg viewBox="0 0 1000 200" role="img" aria-label="问专家与自己查的成本">
+  <text x="20" y="40" font-size="14">组长自己查</text>
+  <rect x="160" y="22" width="600" height="28" class="badbox"/>
+  <text x="170" y="41" font-size="12">搜索 · 打开原页 · 读原文 · 判断（最贵的模型，最稀缺的上下文）</text>
+  <rect x="760" y="22" width="40" height="28" class="lead"/>
+  <text x="810" y="41" font-size="12" class="m">得到结论</text>
+  <text x="20" y="100" font-size="14">问专家</text>
+  <rect x="160" y="82" width="600" height="28" class="expert" opacity="0.55"/>
+  <text x="170" y="101" font-size="12" class="m">原文已经在专家的上下文里（以前付过，缓存命中）</text>
+  <rect x="760" y="82" width="40" height="28" class="expert"/>
+  <text x="810" y="101" font-size="12" class="m">多想一步</text>
+  <text x="20" y="160" font-size="14">问空白座位</text>
+  <rect x="160" y="142" width="600" height="28" class="badbox"/>
+  <text x="170" y="161" font-size="12">什么都没有，只能从头查一遍——这就是"临时工"，名字叫专家也没用</text>
+  <rect x="760" y="142" width="40" height="28" class="box"/>
+  <text x="810" y="161" font-size="12" class="m">得到结论</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="org">2. 组织全貌</h2>
+<p class="src">PRD 第 1 节；H-1、H-3、E-4、E-6、W-1、S-2。专家下面写的是今天台账里真实存在的对象。</p>
+
+<svg viewBox="0 0 1000 560" role="img" aria-label="组织全貌">
+  <rect x="420" y="10" width="160" height="38" rx="6" class="lead"/>
+  <text x="500" y="35" text-anchor="middle" font-size="15">「マスター」</text>
+  <rect x="300" y="72" width="400" height="48" rx="6" class="lead"/>
+  <text x="500" y="93" text-anchor="middle" font-size="14">组长 · 任意接了 MCP 的宿主</text>
+  <text x="500" y="111" text-anchor="middle" font-size="11" class="m">名单不写死；常见宿主如 Claude Code、Codex、Antigravity、Grok、OpenCode、OpenClaw</text>
+  <line x1="500" y1="48" x2="500" y2="72" class="ln"/>
+  <line x1="500" y1="120" x2="500" y2="146" class="ln"/>
+  <rect x="160" y="146" width="680" height="40" rx="6" class="box"/>
+  <text x="500" y="166" text-anchor="middle" font-size="14">同一个 MCP · 同一份台账 · 同一份名录（H-1 单一入口，H-3 记下是哪个宿主派的）</text>
+  <text x="500" y="181" text-anchor="middle" font-size="11" class="m">组长读名录挑专家；不设单独的路由专家（第 5 节）</text>
+  <g font-size="13">
+    <rect x="10" y="216" width="130" height="34" rx="5" class="role"/><text x="75" y="238" text-anchor="middle">Coder</text>
+    <rect x="152" y="216" width="130" height="34" rx="5" class="role"/><text x="217" y="238" text-anchor="middle">Explorer</text>
+    <rect x="294" y="216" width="130" height="34" rx="5" class="role"/><text x="359" y="238" text-anchor="middle">Tester</text>
+    <rect x="436" y="216" width="130" height="34" rx="5" class="role"/><text x="501" y="238" text-anchor="middle">Web Researcher</text>
+    <rect x="578" y="216" width="130" height="34" rx="5" class="role"/><text x="643" y="238" text-anchor="middle">Librarian</text>
+    <rect x="720" y="216" width="130" height="34" rx="5" class="role"/><text x="785" y="238" text-anchor="middle">Refiner</text>
+    <rect x="862" y="216" width="130" height="34" rx="5" class="role"/><text x="927" y="238" text-anchor="middle">Handyman</text>
+  </g>
+  <g font-size="11">
+    <text x="75" y="268" text-anchor="middle" class="m">按目录认</text>
+    <text x="217" y="268" text-anchor="middle" class="m">按目录认</text>
+    <text x="359" y="268" text-anchor="middle" class="m">按目录认</text>
+    <text x="501" y="268" text-anchor="middle" class="m">按领域认（E-4）</text>
+    <text x="643" y="268" text-anchor="middle" class="m">定时（K-2）</text>
+    <text x="785" y="268" text-anchor="middle" class="m">只由服务派</text>
+    <text x="927" y="268" text-anchor="middle" class="m">不走 skill 循环</text>
+  </g>
+  <g font-size="11">
+    <rect x="14" y="280" width="122" height="26" rx="4" class="expert"/><text x="75" y="297" text-anchor="middle">specialist-subagents</text>
+    <rect x="14" y="312" width="122" height="26" rx="4" class="expert"/><text x="75" y="329" text-anchor="middle">hwiki</text>
+    <rect x="14" y="344" width="122" height="26" rx="4" class="expert"/><text x="75" y="361" text-anchor="middle">billing-service</text>
+    <rect x="14" y="376" width="122" height="26" rx="4" class="expert"/><text x="75" y="393" text-anchor="middle">web-app</text>
+    <rect x="156" y="280" width="122" height="26" rx="4" class="expert"/><text x="217" y="297" text-anchor="middle">specialist-subagents</text>
+    <rect x="156" y="312" width="122" height="26" rx="4" class="expert"/><text x="217" y="329" text-anchor="middle">web-app</text>
+    <rect x="156" y="344" width="122" height="26" rx="4" class="expert"/><text x="217" y="361" text-anchor="middle">game-engine</text>
+    <rect x="298" y="280" width="122" height="26" rx="4" class="expert"/><text x="359" y="297" text-anchor="middle">search-daemon</text>
+    <rect x="298" y="312" width="122" height="26" rx="4" class="expert"/><text x="359" y="329" text-anchor="middle">web-app</text>
+    <rect x="440" y="280" width="122" height="26" rx="4" class="expert"/><text x="501" y="297" text-anchor="middle">openai</text>
+    <rect x="440" y="312" width="122" height="26" rx="4" class="expert"/><text x="501" y="329" text-anchor="middle">anthropic</text>
+    <rect x="440" y="344" width="122" height="26" rx="4" class="expert"/><text x="501" y="361" text-anchor="middle">agent-infra</text>
+    <rect x="440" y="376" width="122" height="26" rx="4" class="expert"/><text x="501" y="393" text-anchor="middle">ai-industry</text>
+    <rect x="582" y="280" width="122" height="26" rx="4" class="expert"/><text x="643" y="297" text-anchor="middle">Hwiki knowledge/ai</text>
+    <rect x="724" y="280" width="122" height="26" rx="4" class="expert"/><text x="785" y="297" text-anchor="middle">各角色的候选草稿</text>
+    <rect x="866" y="280" width="122" height="26" rx="4" class="box"/><text x="927" y="297" text-anchor="middle" class="m">一单一件杂活</text>
+  </g>
+  <g font-size="12">
+    <rect x="160" y="430" width="680" height="110" rx="6" class="box"/>
+    <text x="180" y="455" font-size="14">后端（预设里排好的，可增减；下面是现在这几家；换后端不等于换专家）</text>
+    <rect x="180" y="470" width="140" height="50" rx="5" class="record"/><text x="250" y="500" text-anchor="middle">Codex</text>
+    <rect x="340" y="470" width="140" height="50" rx="5" class="record"/><text x="410" y="500" text-anchor="middle">Grok</text>
+    <rect x="500" y="470" width="140" height="50" rx="5" class="record"/><text x="570" y="500" text-anchor="middle">Claude</text>
+    <rect x="660" y="470" width="160" height="50" rx="5" class="record"/><text x="740" y="492" text-anchor="middle">DeepSeek</text><text x="740" y="510" text-anchor="middle" class="m">经 pi</text>
+  </g>
+  <line x1="500" y1="408" x2="500" y2="430" class="ln dash"/>
+  <text x="510" y="422" font-size="11" class="m">专家的这一单由某一家后端执行</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="model">3. 概念模型：谁拥有什么</h2>
+<p class="src">PRD 第 2 节术语；E-1、C-3、C-5、L-1、S-4。</p>
+
+<svg viewBox="0 0 1000 420" role="img" aria-label="概念模型">
+  <rect x="30" y="40" width="170" height="70" rx="6" class="role"/>
+  <text x="115" y="68" text-anchor="middle" font-size="15">角色</text>
+  <text x="115" y="90" text-anchor="middle" font-size="12" class="m">合同 · 工具 · 角色级 skill</text>
+  <rect x="30" y="230" width="170" height="70" rx="6" class="box"/>
+  <text x="115" y="258" text-anchor="middle" font-size="15">对象</text>
+  <text x="115" y="280" text-anchor="middle" font-size="12" class="m">一个目录 / 一个领域</text>
+  <rect x="320" y="130" width="220" height="90" rx="6" class="expert"/>
+  <text x="430" y="160" text-anchor="middle" font-size="16" font-weight="700">专家</text>
+  <text x="430" y="182" text-anchor="middle" font-size="12">语义名字（E-1）· 座位号（键）</text>
+  <text x="430" y="200" text-anchor="middle" font-size="12" class="m">= 角色 × 对象</text>
+  <line x1="200" y1="75" x2="320" y2="160" class="lnfg"/><text x="245" y="105" font-size="12" class="m">1 : n</text>
+  <line x1="200" y1="265" x2="320" y2="195" class="lnfg"/><text x="245" y="250" font-size="12" class="m">1 : n</text>
+  <rect x="660" y="20" width="310" height="300" rx="6" class="record"/>
+  <text x="815" y="46" text-anchor="middle" font-size="15">记录（专家名下，原文留盘）</text>
+  <g font-size="12">
+    <rect x="680" y="62" width="270" height="40" rx="4" class="box"/><text x="690" y="80">会话日志 · 每一单一份</text><text x="690" y="96" class="m">续接就是把它重新灌进上下文</text>
+    <rect x="680" y="110" width="270" height="40" rx="4" class="box"/><text x="690" y="128">报告 · 每一单一份（O-4）</text><text x="690" y="144" class="m">有界，带字节数和哈希</text>
+    <rect x="680" y="158" width="270" height="40" rx="4" class="box"/><text x="690" y="176">交接文档</text><text x="690" y="192" class="m">懂什么 · 没做完 · 坑（S-4 的"坑"在这）</text>
+    <rect x="680" y="206" width="270" height="40" rx="4" class="box"/><text x="690" y="224">变化说明 · 未完成清单</text><text x="690" y="240" class="m">附在下一单前面</text>
+    <rect x="680" y="254" width="270" height="52" rx="4" class="box"/><text x="690" y="272">分身的日志和报告</text><text x="690" y="288" class="m">跑完归回同一个专家（C-3）</text>
+  </g>
+  <line x1="540" y1="175" x2="660" y2="175" class="lnfg"/><text x="575" y="168" font-size="12" class="m">1 : 全部</text>
+  <rect x="320" y="300" width="220" height="70" rx="6" class="box"/>
+  <text x="430" y="328" text-anchor="middle" font-size="15">一单</text>
+  <text x="430" y="350" text-anchor="middle" font-size="12" class="m">由组长派 · 到终态不变</text>
+  <line x1="430" y1="220" x2="430" y2="300" class="lnfg"/><text x="440" y="265" font-size="12" class="m">1 : n</text>
+  <line x1="540" y1="335" x2="680" y2="290" class="ln dash" marker-end="url(#a1m)"/>
+  <text x="560" y="335" font-size="11" class="m">产生日志和报告</text>
+  <text x="30" y="395" font-size="12" class="m">内部的表名 seats 和座位号保留作键；对外文字不再用"座位"。角色级 skill 管手艺，专家的交接文档管对象特有的坑（S-4）。</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="load">4. 一单开工时装什么：现状 vs 目标</h2>
+<p class="src">PRD 第 3 节"记录是文字，会话是记录的一种"；E-2、E-3、C-1、C-2、C-3、C-5。红色是今天代码里把专家变成白纸的三条路。</p>
+
+<div class="grid2">
+<svg viewBox="0 0 500 560" role="img" aria-label="现状的装载路径">
+  <text x="250" y="22" text-anchor="middle" font-size="15" font-weight="700">现状</text>
+  <rect x="160" y="40" width="180" height="36" rx="6" class="lead"/><text x="250" y="63" text-anchor="middle" font-size="13">组长派一单（按目录/领域）</text>
+  <line x1="250" y1="76" x2="250" y2="100" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="140" y="100" width="220" height="36" rx="6" class="box"/><text x="250" y="123" text-anchor="middle" font-size="13">该对象的专家在忙？</text>
+  <line x1="140" y1="118" x2="60" y2="118" class="lnbad"/><line x1="60" y1="118" x2="60" y2="470" class="lnbad" marker-end="url(#a1b)"/>
+  <text x="66" y="150" font-size="12" class="bad">忙</text>
+  <line x1="250" y1="136" x2="250" y2="170" class="lnfg" marker-end="url(#a1)"/><text x="258" y="158" font-size="12" class="m">不忙</text>
+  <rect x="140" y="170" width="220" height="36" rx="6" class="box"/><text x="250" y="193" text-anchor="middle" font-size="13">目录改动 &gt; 20 文件或 500 行？</text>
+  <line x1="360" y1="188" x2="440" y2="188" class="lnbad"/><line x1="440" y1="188" x2="440" y2="470" class="lnbad" marker-end="url(#a1b)"/>
+  <text x="380" y="180" font-size="12" class="bad">是</text>
+  <line x1="250" y1="206" x2="250" y2="240" class="lnfg" marker-end="url(#a1)"/><text x="258" y="228" font-size="12" class="m">否</text>
+  <rect x="140" y="240" width="220" height="36" rx="6" class="box"/><text x="250" y="263" text-anchor="middle" font-size="13">这一单换了后端？</text>
+  <line x1="250" y1="276" x2="250" y2="320" class="lnfg" marker-end="url(#a1)"/><text x="258" y="300" font-size="12" class="m">否</text>
+  <rect x="140" y="320" width="220" height="40" rx="6" class="goodbox"/><text x="250" y="345" text-anchor="middle" font-size="13" class="good">续上会话</text>
+  <line x1="360" y1="258" x2="400" y2="258" class="lnbad"/><line x1="400" y1="258" x2="400" y2="400" class="lnbad" marker-end="url(#a1b)"/>
+  <text x="368" y="250" font-size="12" class="bad">是</text>
+  <rect x="300" y="400" width="190" height="44" rx="6" class="warnbox"/><text x="395" y="420" text-anchor="middle" font-size="12">新会话 + 一两句专长说明</text><text x="395" y="436" text-anchor="middle" font-size="11" class="m">加旧会话路径</text>
+  <rect x="20" y="470" width="460" height="44" rx="6" class="badbox"/><text x="250" y="497" text-anchor="middle" font-size="14" class="bad">空白开工（临时工）</text>
+  <text x="250" y="540" text-anchor="middle" font-size="12" class="m">会话文件一直在磁盘上，是代码选择不读它</text>
+</svg>
+<svg viewBox="0 0 500 560" role="img" aria-label="目标的装载路径">
+  <text x="250" y="22" text-anchor="middle" font-size="15" font-weight="700">目标</text>
+  <rect x="140" y="40" width="220" height="36" rx="6" class="lead"/><text x="250" y="63" text-anchor="middle" font-size="13">组长点名（E-2）或自动挑（E-3）</text>
+  <line x1="250" y1="76" x2="250" y2="100" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="140" y="100" width="220" height="36" rx="6" class="box"/><text x="250" y="123" text-anchor="middle" font-size="13">这个对象已有专家？</text>
+  <line x1="140" y1="118" x2="40" y2="118" class="ln"/><line x1="40" y1="118" x2="40" y2="470" class="ln" marker-end="url(#a1m)"/>
+  <text x="46" y="150" font-size="12" class="m">没有</text>
+  <line x1="250" y1="136" x2="250" y2="170" class="lnfg" marker-end="url(#a1)"/><text x="258" y="158" font-size="12" class="m">有</text>
+  <rect x="140" y="170" width="220" height="36" rx="6" class="box"/><text x="250" y="193" text-anchor="middle" font-size="13">专家在忙？</text>
+  <line x1="360" y1="188" x2="440" y2="188" class="lngood"/><line x1="440" y1="188" x2="440" y2="400" class="lngood" marker-end="url(#a1g)"/>
+  <text x="380" y="180" font-size="12" class="good">忙 → 分身（C-3）</text>
+  <line x1="250" y1="206" x2="250" y2="240" class="lnfg" marker-end="url(#a1)"/><text x="258" y="228" font-size="12" class="m">不忙</text>
+  <rect x="140" y="240" width="220" height="36" rx="6" class="box"/><text x="250" y="263" text-anchor="middle" font-size="13">会话能原样续上？</text>
+  <line x1="250" y1="276" x2="250" y2="320" class="lnfg" marker-end="url(#a1)"/><text x="258" y="300" font-size="12" class="m">能</text>
+  <rect x="110" y="320" width="280" height="44" rx="6" class="goodbox"/><text x="250" y="340" text-anchor="middle" font-size="13" class="good">续上会话</text><text x="250" y="356" text-anchor="middle" font-size="11" class="m">目录改了多少都续，附变化说明（C-2）</text>
+  <line x1="140" y1="258" x2="100" y2="258" class="lngood"/><line x1="100" y1="258" x2="100" y2="400" class="lngood" marker-end="url(#a1g)"/>
+  <text x="104" y="250" font-size="12" class="good">不能</text>
+  <rect x="80" y="400" width="400" height="56" rx="6" class="goodbox"/>
+  <text x="280" y="422" text-anchor="middle" font-size="13" class="good">新会话，但装进专家的记录（C-1）</text>
+  <text x="280" y="442" text-anchor="middle" font-size="11" class="m">最近的会话日志当文字 → 装不下就交接 + 原文路径（C-5）</text>
+  <rect x="20" y="470" width="200" height="44" rx="6" class="box"/><text x="120" y="497" text-anchor="middle" font-size="13">新专家（新对象）</text>
+  <text x="250" y="540" text-anchor="middle" font-size="12" class="good">派给已有专家的一单，没有任何一条路通向空白</text>
+</svg>
+</div>
+
+<h3>今天的台账：交给临时工的比例</h3>
+<p class="src">数据来自 <code>doc/review-2026-10-01-intent-and-direction.md</code> 3.5 节（09-22 至 09-30，64 单真实工作）；C-6 要求 <code>prd-check</code> 持续算这组数。</p>
+<svg viewBox="0 0 1000 170" role="img" aria-label="续接情况分布">
+  <text x="20" y="44" font-size="13">10-01 评审</text>
+  <rect x="140" y="24" width="171" height="32" class="goodbox"/><text x="225" y="45" text-anchor="middle" font-size="12">续上 13</text>
+  <rect x="311" y="24" width="368" height="32" class="badbox"/><text x="495" y="45" text-anchor="middle" font-size="12">新会话 28（首次来、专家忙、换后端……）</text>
+  <rect x="679" y="24" width="263" height="32" class="badbox" opacity="0.7"/><text x="810" y="45" text-anchor="middle" font-size="12">目录大改被强制换新 20</text>
+  <rect x="942" y="24" width="40" height="32" class="box"/><text x="962" y="45" text-anchor="middle" font-size="11" class="m">3</text>
+  <text x="140" y="78" font-size="11" class="m">每格宽度按 64 单等比；"新会话 28"里还没拆出哪些是真正的新对象，C-6 要把它拆开</text>
+  <text x="20" y="128" font-size="13">目标</text>
+  <rect x="140" y="108" width="842" height="32" class="goodbox"/>
+  <text x="560" y="129" text-anchor="middle" font-size="12" class="good">派给已有专家的单子：续上会话，或装载记录开工；空白开工 = 0</text>
+  <text x="140" y="160" font-size="11" class="m">只有"第一次碰这个对象"可以从零开始</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="ctx">5. 一个专家的上下文里装着什么</h2>
+<p class="src">PRD 第 3 节"压缩要晚、要少""粒度要细"；C-4、C-5、L-4。</p>
+<svg viewBox="0 0 1000 230" role="img" aria-label="上下文窗口">
+  <text x="20" y="30" font-size="13">上下文窗口（以该后端的上限为 100%）</text>
+  <rect x="20" y="44" width="960" height="54" rx="4" class="box"/>
+  <rect x="20" y="44" width="70" height="54" class="role"/><text x="55" y="66" text-anchor="middle" font-size="11">合同</text><text x="55" y="82" text-anchor="middle" font-size="11">skill</text>
+  <rect x="90" y="44" width="70" height="54" class="record"/><text x="125" y="74" text-anchor="middle" font-size="11">交接</text>
+  <rect x="160" y="44" width="380" height="54" class="expert"/><text x="350" y="68" text-anchor="middle" font-size="12">原文：以前读过的网页、代码、工具输出</text><text x="350" y="86" text-anchor="middle" font-size="11" class="m">专家的价值就在这一段</text>
+  <rect x="540" y="44" width="80" height="54" class="lead"/><text x="580" y="74" text-anchor="middle" font-size="11">这一单</text>
+  <line x1="500" y1="34" x2="500" y2="112" stroke="var(--warn)" stroke-width="2" class="dash"/>
+  <text x="500" y="128" text-anchor="middle" font-size="12" fill="var(--warn)">50%：名录提示"建议拆分"（L-4）</text>
+  <line x1="940" y1="34" x2="940" y2="112" stroke="var(--bad)" stroke-width="2"/>
+  <text x="940" y="128" text-anchor="end" font-size="12" class="bad">自动压缩尽量晚（C-4）</text>
+  <text x="20" y="168" font-size="13">压缩丢的是什么：</text>
+  <rect x="160" y="152" width="200" height="26" rx="4" class="goodbox"/><text x="260" y="170" text-anchor="middle" font-size="12">结论（摘要里有）</text>
+  <rect x="370" y="152" width="290" height="26" rx="4" class="badbox"/><text x="515" y="170" text-anchor="middle" font-size="12">看过什么、没写进结论的细节</text>
+  <text x="670" y="170" font-size="12" class="m">→ "这条是不是新的"只有原文能答</text>
+  <text x="20" y="210" font-size="12" class="m">所以：原文留盘，专家自己知道去哪翻（C-5）；问"新不新"送回持有原文的专家，组长不凭摘要判断。</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="life">6. 专家的生命周期</h2>
+<p class="src">PRD 4.3；L-1 至 L-5、C-3、E-5。</p>
+<svg viewBox="0 0 1000 380" role="img" aria-label="专家生命周期">
+  <rect x="30" y="160" width="120" height="44" rx="22" class="box"/><text x="90" y="187" text-anchor="middle" font-size="14">新开</text>
+  <line x1="150" y1="182" x2="300" y2="182" class="lnfg" marker-end="url(#a1)"/>
+  <text x="160" y="172" font-size="11" class="m">第一次碰这个对象</text>
+  <rect x="300" y="150" width="200" height="64" rx="32" class="expert"/><text x="400" y="178" text-anchor="middle" font-size="15">活跃</text><text x="400" y="198" text-anchor="middle" font-size="11" class="m">接单 · 积累记录 · 可改名（E-5）</text>
+  <path d="M360,150 C340,90 460,90 440,150" class="lnfg" marker-end="url(#a1)"/>
+  <text x="400" y="84" text-anchor="middle" font-size="12">一单（续上或装载记录）</text>
+  <rect x="320" y="270" width="160" height="40" rx="20" class="warnbox"/><text x="400" y="295" text-anchor="middle" font-size="13">分身（C-3）</text>
+  <line x1="380" y1="214" x2="380" y2="270" class="ln" marker-end="url(#a1m)"/><text x="306" y="246" font-size="11" class="m">正忙时</text>
+  <line x1="420" y1="270" x2="420" y2="214" class="ln dash" marker-end="url(#a1m)"/><text x="428" y="246" font-size="11" class="m">记录归回</text>
+  <rect x="640" y="40" width="160" height="44" rx="6" class="box"/><text x="720" y="60" text-anchor="middle" font-size="13">合并（L-1）</text><text x="720" y="76" text-anchor="middle" font-size="11" class="m">作为 A 写交接给 B</text>
+  <rect x="640" y="160" width="160" height="44" rx="6" class="box"/><text x="720" y="180" text-anchor="middle" font-size="13">拆分（L-3）</text><text x="720" y="196" text-anchor="middle" font-size="11" class="m">各写一份聚焦交接</text>
+  <rect x="640" y="280" width="160" height="44" rx="6" class="box"/><text x="720" y="300" text-anchor="middle" font-size="13">归档（L-2）</text><text x="720" y="316" text-anchor="middle" font-size="11" class="m">记原因，不进名录</text>
+  <line x1="500" y1="170" x2="640" y2="62" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="500" y1="182" x2="640" y2="182" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="500" y1="196" x2="640" y2="300" class="lnfg" marker-end="url(#a1)"/>
+  <text x="520" y="230" font-size="11" class="m">L-4 信号：压缩过或 &gt;50%</text>
+  <text x="520" y="245" font-size="11" class="m">→ 名录提示建议拆分</text>
+  <rect x="860" y="40" width="120" height="44" rx="22" class="box"/><text x="920" y="67" text-anchor="middle" font-size="13">已归档</text>
+  <rect x="860" y="280" width="120" height="44" rx="22" class="box"/><text x="920" y="307" text-anchor="middle" font-size="13">已归档</text>
+  <line x1="800" y1="62" x2="860" y2="62" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="800" y1="302" x2="860" y2="302" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="850" y="150" width="140" height="28" rx="14" class="expert"/><text x="920" y="169" text-anchor="middle" font-size="12">新专家 X</text>
+  <rect x="850" y="186" width="140" height="28" rx="14" class="expert"/><text x="920" y="205" text-anchor="middle" font-size="12">新专家 Y</text>
+  <line x1="800" y1="176" x2="850" y2="164" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="800" y1="188" x2="850" y2="200" class="lnfg" marker-end="url(#a1)"/>
+  <text x="30" y="360" font-size="12" class="m">已归档的专家：记录和台账全都留着，只是不在名录里。取消一单在跑的活（L-5）应该只停这一单——现在的代码会顺带把专家归档，见第 12 节第 6 条。</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="merge">7. 合并 A 到 B 的过程</h2>
+<p class="src">PRD L-1。"两段会话合不成一段，但交接能把 A 的理解交给 B，原文仍在磁盘上。"</p>
+<svg viewBox="0 0 1000 420" role="img" aria-label="合并时序">
+  <g font-size="14" text-anchor="middle">
+    <rect x="40" y="16" width="160" height="34" rx="5" class="lead"/><text x="120" y="38">组长</text>
+    <rect x="300" y="16" width="160" height="34" rx="5" class="box"/><text x="380" y="38">服务</text>
+    <rect x="560" y="16" width="160" height="34" rx="5" class="expert"/><text x="640" y="38">专家 A</text>
+    <rect x="800" y="16" width="160" height="34" rx="5" class="expert"/><text x="880" y="38">专家 B</text>
+  </g>
+  <g class="ln dash"><line x1="120" y1="50" x2="120" y2="400"/><line x1="380" y1="50" x2="380" y2="400"/><line x1="640" y1="50" x2="640" y2="400"/><line x1="880" y1="50" x2="880" y2="400"/></g>
+  <g font-size="12">
+    <line x1="120" y1="80" x2="380" y2="80" class="lnfg" marker-end="url(#a1)"/><text x="130" y="74">seat_merge {from: A, into: B}</text>
+    <line x1="380" y1="96" x2="120" y2="96" class="ln" marker-end="url(#a1m)"/><text x="130" y="112" class="m">立刻返回（不阻塞，O-1）</text>
+    <line x1="380" y1="140" x2="640" y2="140" class="lnfg" marker-end="url(#a1)"/><text x="390" y="134">续接 A 的会话，跑最后一单</text>
+    <rect x="600" y="152" width="80" height="44" rx="4" class="record"/><text x="640" y="172" text-anchor="middle">写交接</text><text x="640" y="188" text-anchor="middle" class="m">懂·未完·坑</text>
+    <line x1="640" y1="210" x2="380" y2="210" class="lnfg" marker-end="url(#a1)"/><text x="400" y="204">交接文档</text>
+    <line x1="380" y1="236" x2="880" y2="236" class="lngood" marker-end="url(#a1g)"/><text x="560" y="230">存进 B 的记录，标"下一单附一次"</text>
+    <line x1="380" y1="262" x2="640" y2="262" class="lnfg" marker-end="url(#a1)"/><text x="390" y="256">归档 A，原因"并入 B"</text>
+    <rect x="590" y="270" width="100" height="26" rx="4" class="box"/><text x="640" y="288" text-anchor="middle" class="m">已归档</text>
+    <line x1="120" y1="320" x2="880" y2="320" class="lnfg" marker-end="url(#a1)"/><text x="130" y="314">之后组长派给 B 的第一单</text>
+    <rect x="820" y="330" width="120" height="40" rx="4" class="goodbox"/><text x="880" y="348" text-anchor="middle">任务前缀：</text><text x="880" y="364" text-anchor="middle">交接 + A 的原文路径</text>
+    <text x="830" y="392" class="m">再下一单：不再附</text>
+    <text x="400" y="160" class="bad">A 那一单失败 → 不归档 A，记事件</text>
+  </g>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="learn">8. 学习：困难怎么变成手艺</h2>
+<p class="src">PRD 4.5；S-1 至 S-5。前提（持久）和这个循环是先后关系，不是二选一：循环一直跑。</p>
+<svg viewBox="0 0 1000 400" role="img" aria-label="学习循环">
+  <g font-size="13" text-anchor="middle">
+    <rect x="30" y="60" width="170" height="50" rx="6" class="expert"/><text x="115" y="82">专家干活</text><text x="115" y="100" font-size="11" class="m">一单</text>
+    <rect x="260" y="60" width="170" height="50" rx="6" class="box"/><text x="345" y="82">runner 从痕迹识别困难</text><text x="345" y="100" font-size="11" class="m">不问模型；本职不算（S-1）</text>
+    <rect x="490" y="60" width="170" height="50" rx="6" class="box"/><text x="575" y="82">困难账本</text><text x="575" y="100" font-size="11" class="m">角色×类型×工具，记专家号</text>
+    <rect x="720" y="60" width="200" height="50" rx="6" class="box"/><text x="820" y="82">攒满 5 条 → refiner 写候选</text><text x="820" y="100" font-size="11" class="m">不启用（S-2）</text>
+    <rect x="720" y="180" width="200" height="50" rx="6" class="warnbox"/><text x="820" y="202">审核门（S-3）</text><text x="820" y="220" font-size="11" class="m">逐条判 真/不成立/偶发</text>
+    <rect x="460" y="180" width="200" height="50" rx="6" class="role"/><text x="560" y="202">角色级 skill（HSkills）</text><text x="560" y="220" font-size="11" class="m">手艺：怎么写代码、怎么查</text>
+    <rect x="200" y="180" width="200" height="50" rx="6" class="record"/><text x="300" y="202">下一单带着新 skill</text><text x="300" y="220" font-size="11" class="m">事件里记带的是哪一版</text>
+  </g>
+  <line x1="200" y1="85" x2="260" y2="85" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="430" y1="85" x2="490" y2="85" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="660" y1="85" x2="720" y2="85" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="820" y1="110" x2="820" y2="180" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="720" y1="205" x2="660" y2="205" class="lngood" marker-end="url(#a1g)"/><text x="672" y="196" font-size="11" class="good">启用</text>
+  <line x1="460" y1="205" x2="400" y2="205" class="lnfg" marker-end="url(#a1)"/>
+  <path d="M200,205 C110,205 110,150 115,110" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="920" y1="205" x2="960" y2="205" class="lnbad"/><text x="930" y="196" font-size="11" class="bad">退回</text>
+  <rect x="30" y="290" width="300" height="80" rx="6" class="box"/>
+  <text x="45" y="314" font-size="13">Handyman：skill_loop: false</text>
+  <text x="45" y="334" font-size="12" class="m">困难照记，攒满不派 refiner</text>
+  <text x="45" y="352" font-size="12" class="m">杂活的教训只能用一次（S-2）</text>
+  <rect x="360" y="290" width="300" height="80" rx="6" class="record"/>
+  <text x="375" y="314" font-size="13">对象特有的坑（S-4）</text>
+  <text x="375" y="334" font-size="12" class="m">不进角色级 skill</text>
+  <text x="375" y="352" font-size="12" class="m">进那个专家的交接文档</text>
+  <rect x="690" y="290" width="290" height="80" rx="6" class="box"/>
+  <text x="705" y="314" font-size="13">角色记忆（S-5）</text>
+  <text x="705" y="334" font-size="12" class="m">角色级少量事实，派活前注入</text>
+  <text x="705" y="352" font-size="12" class="m">只能加事实，不能改职责</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="gov">9. 治理：怎么保证不再写丢</h2>
+<p class="src">PRD 第 0 节；P-1、P-2、P-3。</p>
+<svg viewBox="0 0 1000 300" role="img" aria-label="治理">
+  <rect x="20" y="40" width="180" height="70" rx="6" class="box"/><text x="110" y="68" text-anchor="middle" font-size="14">doc/PRD.md</text><text x="110" y="90" text-anchor="middle" font-size="12" class="m">唯一权威 · 8 场景 + 54 条</text>
+  <rect x="20" y="170" width="180" height="90" rx="6" class="box"/>
+  <text x="110" y="194" text-anchor="middle" font-size="12">README</text>
+  <text x="110" y="212" text-anchor="middle" font-size="12">SKILL.md</text>
+  <text x="110" y="230" text-anchor="middle" font-size="12">dispatch/team-leader.md</text>
+  <text x="110" y="248" text-anchor="middle" font-size="12" class="m">REQUIREMENTS.md（已取代）</text>
+  <line x1="110" y1="170" x2="110" y2="110" class="lnfg" marker-end="url(#a1)"/><text x="118" y="146" font-size="11" class="m">开头指向 PRD（P-2）</text>
+  <line x1="200" y1="75" x2="300" y2="75" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="300" y="40" width="220" height="70" rx="6" class="box"/><text x="410" y="66" text-anchor="middle" font-size="13">tests/*.test.mjs</text><text x="410" y="86" text-anchor="middle" font-size="12" class="m">测试名带 [C-2] 这样的编号（P-3）</text>
+  <line x1="520" y1="75" x2="600" y2="75" class="lnfg" marker-end="url(#a1)"/>
+  <rect x="600" y="40" width="200" height="70" rx="6" class="box"/><text x="700" y="66" text-anchor="middle" font-size="13">node tools/prd-check.mjs</text><text x="700" y="86" text-anchor="middle" font-size="12" class="m">P-1 · 另算 C-6 的数字</text>
+  <line x1="800" y1="60" x2="860" y2="45" class="lngood" marker-end="url(#a1g)"/>
+  <line x1="800" y1="90" x2="860" y2="105" class="lnbad" marker-end="url(#a1b)"/>
+  <rect x="860" y="25" width="120" height="34" rx="5" class="goodbox"/><text x="920" y="47" text-anchor="middle" font-size="13" class="good">已实现</text>
+  <rect x="860" y="90" width="120" height="34" rx="5" class="badbox"/><text x="920" y="112" text-anchor="middle" font-size="13" class="bad">未实现·卡在哪</text>
+  <rect x="300" y="170" width="500" height="90" rx="6" class="badbox"/>
+  <text x="550" y="196" text-anchor="middle" font-size="13" class="bad">本项目过去丢东西的方式（REQUIREMENTS 7.2 实锤）</text>
+  <text x="550" y="218" text-anchor="middle" font-size="12">"会话四件套（建/列/读会话、对岗位提问）——暂时不做"</text>
+  <text x="550" y="238" text-anchor="middle" font-size="12" class="m">= HSubagent 的点名 ask_session，从此没人负责重启</text>
+  <text x="550" y="254" text-anchor="middle" font-size="12" class="good">PRD 里它回到了 E-2、E-6、C-5</text>
+</svg>
+
+<h3 id="e2e">两层验收：端到端为准</h3>
+<p class="src">PRD 第 0 节第 6 条；4.0 节 T-1 至 T-9；P-1。零件测试全绿不算做完，整条链路跑通才算；最终的端到端是真实使用。</p>
+<svg viewBox="0 0 1000 330" role="img" aria-label="端到端验收">
+  <text x="20" y="28" font-size="14" font-weight="700">上层：端到端场景（判定"做完"）</text>
+  <g font-size="12" text-anchor="middle">
+    <rect x="20" y="44" width="150" height="50" rx="6" class="lead"/><text x="95" y="66">组长经 MCP 派活</text><text x="95" y="84" class="m">真实工具调用</text>
+    <rect x="200" y="44" width="170" height="50" rx="6" class="box"/><text x="285" y="66">服务挑专家</text><text x="285" y="84" class="m">装载记录</text>
+    <rect x="400" y="44" width="170" height="50" rx="6" class="record"/><text x="485" y="66">后端执行</text><text x="485" y="84" class="m">假后端 / 便宜的真模型</text>
+    <rect x="600" y="44" width="150" height="50" rx="6" class="box"/><text x="675" y="66">台账 · 报告</text><text x="675" y="84" class="m">记录归到专家</text>
+    <rect x="780" y="44" width="200" height="50" rx="6" class="goodbox"/><text x="880" y="66">断言看结果</text><text x="880" y="84" class="m">答得出上次读到的？</text>
+  </g>
+  <line x1="170" y1="69" x2="200" y2="69" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="370" y1="69" x2="400" y2="69" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="570" y1="69" x2="600" y2="69" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="750" y1="69" x2="780" y2="69" class="lnfg" marker-end="url(#a1)"/>
+  <g font-size="12">
+    <rect x="20" y="112" width="960" height="70" rx="6" class="box"/>
+    <text x="34" y="134">T-1 同一问题问两次 · T-2 目录大改后接着干 · T-3 专家忙时再来一单 · T-4 合并</text>
+    <text x="34" y="154">T-5 取消一单、专家还在 · T-6 换后端 · T-7 新开专家、改名、点名 · T-8 学习闭环</text>
+    <text x="34" y="173" class="m">每个场景都来自 2026-10-10 真实踩过的坑；场景随真实使用补充</text>
+  </g>
+  <text x="20" y="214" font-size="14" font-weight="700">下层：每条需求自己的测试（只用来定位坏在哪一步）</text>
+  <g font-size="11">
+    <rect x="20" y="226" width="60" height="24" rx="3" class="box"/><text x="50" y="242" text-anchor="middle">[E-2]</text>
+    <rect x="86" y="226" width="60" height="24" rx="3" class="box"/><text x="116" y="242" text-anchor="middle">[C-1]</text>
+    <rect x="152" y="226" width="60" height="24" rx="3" class="box"/><text x="182" y="242" text-anchor="middle">[C-2]</text>
+    <rect x="218" y="226" width="60" height="24" rx="3" class="box"/><text x="248" y="242" text-anchor="middle">[L-1]</text>
+    <text x="290" y="242" class="m">…… 54 条</text>
+  </g>
+  <rect x="560" y="206" width="420" height="104" rx="6" class="warnbox"/>
+  <text x="575" y="228" font-size="13">最终的端到端：真实使用</text>
+  <text x="575" y="250" font-size="12" class="m">C-6：你日常派活里，派给已有专家却空白开工的单数</text>
+  <text x="575" y="270" font-size="12" class="m">场景全过而真实数字不达标 → 还有场景没想到 → 补场景</text>
+  <text x="575" y="292" font-size="12" class="m">一条需求 = 自己的测试过 且 覆盖它的场景全过</text>
+  <text x="20" y="290" font-size="12" class="m">零件测试全绿、整条链路续接率 20%——这是本项目过去的样子。</text>
+</svg>
+<div class="chips">
+  <span class="chip t-new"><b>T-1</b>同一问题问两次</span><span class="chip t-new"><b>T-2</b>目录大改后接着干</span><span class="chip t-new"><b>T-3</b>忙时再来一单</span><span class="chip t-new"><b>T-4</b>合并</span><span class="chip t-new"><b>T-5</b>取消一单、专家还在</span><span class="chip t-new"><b>T-6</b>换后端</span><span class="chip t-new"><b>T-7</b>新开、改名、点名</span><span class="chip t-new"><b>T-8</b>学习闭环</span><span class="chip t-new"><b>T-9</b>收尾只留真正未完成</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="phase">10. 实施顺序：依赖决定先后，不决定做不做</h2>
+<p class="src">PRD 第 6 节。</p>
+<svg viewBox="0 0 1000 330" role="img" aria-label="实施顺序">
+  <g font-size="12">
+    <rect x="20" y="130" width="130" height="70" rx="6" class="box"/><text x="85" y="152" text-anchor="middle" font-size="13" font-weight="700">1 治理</text><text x="85" y="172" text-anchor="middle">P-1 P-2 P-3</text><text x="85" y="188" text-anchor="middle" class="m">+ 写好 T-1~T-8</text>
+    <rect x="190" y="130" width="140" height="70" rx="6" class="box"/><text x="260" y="152" text-anchor="middle" font-size="13" font-weight="700">2 寻址</text><text x="260" y="172" text-anchor="middle">E-5 E-1 E-2</text><text x="260" y="188" text-anchor="middle">E-7 E-6</text>
+    <rect x="370" y="130" width="150" height="70" rx="6" class="box"/><text x="445" y="152" text-anchor="middle" font-size="13" font-weight="700">3 连续性</text><text x="445" y="172" text-anchor="middle">C-2 C-1 C-5</text><text x="445" y="188" text-anchor="middle">C-4 C-3 C-6</text>
+    <rect x="560" y="40" width="150" height="70" rx="6" class="box"/><text x="635" y="62" text-anchor="middle" font-size="13" font-weight="700">4 生命周期</text><text x="635" y="82" text-anchor="middle">L-2 L-1 L-3 L-4</text>
+    <rect x="560" y="220" width="150" height="70" rx="6" class="box"/><text x="635" y="242" text-anchor="middle" font-size="13" font-weight="700">5 行为与学习</text><text x="635" y="262" text-anchor="middle">B-1 B-3 S-1 S-4</text>
+    <rect x="750" y="220" width="220" height="70" rx="6" class="box"/><text x="860" y="242" text-anchor="middle" font-size="13" font-weight="700">6 跨宿主与岗位墙</text><text x="860" y="262" text-anchor="middle">H-3 H-1 H-2 H-4 O-2 W-1</text>
+    <rect x="750" y="40" width="220" height="70" rx="6" class="expert"/><text x="860" y="62" text-anchor="middle" font-size="13" font-weight="700">7 清理名录</text><text x="860" y="82" text-anchor="middle">用 L-1 L-2 E-5 过一遍</text><text x="860" y="98" text-anchor="middle" class="m">合并重复、归档、起语义名</text>
+  </g>
+  <line x1="150" y1="165" x2="190" y2="165" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="330" y1="165" x2="370" y2="165" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="520" y1="150" x2="560" y2="80" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="520" y1="180" x2="560" y2="250" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="710" y1="75" x2="750" y2="75" class="lnfg" marker-end="url(#a1)"/>
+  <line x1="710" y1="255" x2="750" y2="255" class="lnfg" marker-end="url(#a1)"/>
+  <path d="M260,130 C260,40 560,30 750,60" class="ln dash" marker-end="url(#a1m)"/>
+  <text x="380" y="40" font-size="11" class="m">清理名录要用改名和点名</text>
+  <text x="20" y="315" font-size="12" class="m">每一期结束：测试全过、服务可用、可回退，「マスター」点头才进下一期。标"现有用例"的需求在第 1 期由 prd-check 确认，不通过的进对应的期。</text>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="map">11. 需求地图（54 条）</h2>
+<p class="src">PRD 第 4 节。颜色是验收的形态，不是状态——状态只由 <code>prd-check</code> 给，现在它还不存在，所以这里一条都不标"已实现"。</p>
+<p class="legend">
+  <span><i style="background:var(--blue)"></i>现有测试（待 prd-check 确认）</span>
+  <span><i style="background:var(--warn)"></i>要新写测试</span>
+  <span><i style="background:var(--good)"></i>台账查询</span>
+  <span><i style="background:var(--muted)"></i>文字检查</span>
+  <span><i style="background:#8e5bb5"></i>宿主侧（每接一个宿主补一个）</span>
+  <span><i style="border:1px dotted var(--muted)"></i>仅在决定发布时</span>
+</p>
+<h3>4.1 专家与寻址</h3>
+<div class="chips">
+  <span class="chip t-new"><b>E-1</b>语义名字</span><span class="chip t-new"><b>E-2</b>点名派活</span><span class="chip t-old"><b>E-3</b>自动挑并说清</span><span class="chip t-old"><b>E-4</b>按领域认</span><span class="chip t-new"><b>E-5</b>改名</span><span class="chip t-old"><b>E-6</b>名录</span><span class="chip t-new"><b>E-7</b>不重复</span>
+</div>
+<h3>4.2 记录与连续性</h3>
+<div class="chips">
+  <span class="chip t-new"><b>C-1</b>不从零开始</span><span class="chip t-new"><b>C-2</b>目录变了不丢会话</span><span class="chip t-new"><b>C-3</b>忙时开分身</span><span class="chip t-new"><b>C-4</b>压缩晚、可配</span><span class="chip t-new"><b>C-5</b>知道原文在哪</span><span class="chip t-ledger"><b>C-6</b>临时工率</span>
+</div>
+<h3>4.3 生命周期</h3>
+<div class="chips">
+  <span class="chip t-new"><b>L-1</b>合并</span><span class="chip t-new"><b>L-2</b>归档带原因</span><span class="chip t-new"><b>L-3</b>拆分</span><span class="chip t-new"><b>L-4</b>太宽的信号</span><span class="chip t-old"><b>L-5</b>取消与超时</span>
+</div>
+<h3>4.4 专家的行为</h3>
+<div class="chips">
+  <span class="chip t-new"><b>B-1</b>先问自己知不知道</span><span class="chip t-new"><b>B-2</b>写回 Hwiki</span><span class="chip t-new"><b>B-3</b>跨角色靠问</span>
+</div>
+<h3>4.5 学习</h3>
+<div class="chips">
+  <span class="chip t-old"><b>S-1</b>困难账本</span><span class="chip t-old"><b>S-2</b>skill 循环照常</span><span class="chip t-old"><b>S-3</b>审核门</span><span class="chip t-new"><b>S-4</b>两层 skill</span><span class="chip t-old"><b>S-5</b>角色记忆</span>
+</div>
+<h3>4.6 派活与回报</h3>
+<div class="chips">
+  <span class="chip t-old"><b>O-1</b>不阻塞</span><span class="chip t-host"><b>O-2</b>完成叫醒组长</span><span class="chip t-old"><b>O-3</b>并发上限</span><span class="chip t-old"><b>O-4</b>有界报告</span><span class="chip t-old"><b>O-5</b>取结果</span>
+</div>
+<p class="src">O-5 / T-9（2026-10-11）：只新增本单原始用户任务要求但确实未完成的事项。岗位常规动作、记录路径、未要求或禁止的动作不自动成为待办；历史待办不自动执行，真正的旧剩余不因无关 hello 被清空，收尾失败仍保留原清单。</p>
+<h3>4.7 角色与边界</h3>
+<div class="chips">
+  <span class="chip t-old"><b>R-1</b>角色是数据</span><span class="chip t-old"><b>R-2</b>合同版本化</span><span class="chip t-old"><b>R-3</b>启动期断言</span><span class="chip t-old"><b>R-4</b>写入边界</span><span class="chip t-text"><b>R-5</b>coder 只干定死的活</span>
+</div>
+<h3>4.8 台账 · 4.9 跨宿主 · 4.10 后台角色 · 4.11 岗位墙 · 4.12 治理</h3>
+<div class="chips">
+  <span class="chip t-old"><b>G-1</b>台账与事件</span><span class="chip t-old"><b>G-2</b>启动核对</span><span class="chip t-new"><b>G-3</b>迁移可回退</span>
+  <span class="chip t-host"><b>H-1</b>单一入口</span><span class="chip t-host"><b>H-2</b>native 保持关闭</span><span class="chip t-new"><b>H-3</b>记下哪个组长</span><span class="chip t-host"><b>H-4</b>每轮可见</span>
+  <span class="chip t-old"><b>K-1</b>图书馆管理员</span><span class="chip t-old"><b>K-2</b>定时角色</span><span class="chip t-old"><b>K-3</b>followed_by</span>
+  <span class="chip t-new"><b>W-1</b>墙上角色点进专家</span>
+  <span class="chip t-new"><b>P-1</b>prd-check</span><span class="chip t-text"><b>P-2</b>入口指向 PRD</span><span class="chip t-new"><b>P-3</b>测试带编号</span>
+</div>
+<h3>4.13 对外发布之前</h3>
+<div class="chips">
+  <span class="chip t-cond"><b>X-1</b>Host/Origin 检查</span><span class="chip t-cond"><b>X-2</b>413</span><span class="chip t-cond"><b>X-3</b>watchdog 编码</span><span class="chip t-cond"><b>X-4</b>pid 回收</span>
+</div>
+
+<h3>原 REQUIREMENTS 去哪了</h3>
+<svg viewBox="0 0 1000 250" role="img" aria-label="旧需求的去向">
+  <g font-size="12">
+    <rect x="20" y="20" width="300" height="210" rx="6" class="box"/>
+    <text x="35" y="44" font-size="13">REQUIREMENTS.md</text>
+    <text x="35" y="70">FR-1 至 FR-21（21 条）</text>
+    <text x="35" y="104">7.2 会话四件套</text>
+    <text x="35" y="130">7.2 经验候选两层</text>
+    <text x="35" y="156">7.2 岗位之间对话</text>
+    <text x="35" y="182">7.2 legacy 别名、Codex hook</text>
+    <text x="35" y="208">§12 发布前待办</text>
+    <rect x="680" y="20" width="300" height="210" rx="6" class="box"/>
+    <text x="695" y="44" font-size="13">PRD.md</text>
+    <text x="695" y="70">全部并入，每条标"原 FR-n"</text>
+    <text x="695" y="104">E-2 点名 · E-6 名录 · C-5 原文</text>
+    <text x="695" y="130">S-3 审核门</text>
+    <text x="695" y="156">B-3 跨角色靠问</text>
+    <text x="695" y="182">第 5 节：建议不做（待确认）</text>
+    <text x="695" y="208">X-1 至 X-4（仅在决定发布时）</text>
+  </g>
+  <g class="ln"><line x1="320" y1="66" x2="680" y2="66"/><line x1="320" y1="100" x2="680" y2="100"/><line x1="320" y1="126" x2="680" y2="126"/><line x1="320" y1="152" x2="680" y2="152"/><line x1="320" y1="178" x2="680" y2="178"/><line x1="320" y1="204" x2="680" y2="204"/></g>
+</svg>
+
+<!-- ============================================================ -->
+<h2 id="holes">12. 画图时画不出来的地方</h2>
+<p>把 PRD 画成图，凡是含糊的地方图就连不上线。下面是这次画不出来、或者画出来才发现说法有矛盾的几处。它们是 PRD 自己的漏洞，要在讨论里补上，补完再进需求表。</p>
+<ul class="holes">
+  <li><b>1. 分身跑完之后，"专家的会话"是哪一份？</b>
+    第 4、6 张图里，分身的记录"归回同一个专家"，但箭头画不下去：专家原来的会话和分身的会话从同一点分叉，各自往前走了一段。下一单续接哪一份？两份都留在记录里没问题，"能原样续上"那一步需要一个确定的答案。C-3 现在没写。</li>
+  <li><b>2. C-1 的兜底要求"装交接文档"，可普通专家没有交接文档。</b>
+    第 4 张目标图的绿色兜底框写着"装不下就装交接"，但第 3 张概念图里，交接文档只在合并（L-1）、拆分（L-3）时才产生。一个从没合并过的专家，会话日志又大到装不下，兜底就落空了。需要补一条：交接文档什么时候写、多久更新一次（例如会话超过 L-4 的阈值时由专家自己写）。</li>
+  <li><b>3. 目录专家拆分以后，自动挑人（E-3）挑不出来。</b>
+    第 6 张图里拆分得到"新专家 X、Y"。web_researcher 按领域拆没问题（两个领域名）。可 coder 是按目录认人的：同一个目录拆成两个专家后，下一单只给目录，E-3 不知道该交给 X 还是 Y。要么目录专家的拆分必须拆成子目录，要么"对象"不能只是目录，得允许"目录 + 主题"。这直接连到第 7 节"对象的命名约定"。</li>
+  <li><b>4. "跨角色靠问"（B-3）的箭头只能画到组长。</b>
+    第 2 张组织图里，专家之间没有线：coder 想知道 explorer 读懂了什么，要么读它的交接文档（又回到漏洞 2：可能不存在），要么"经组长问"——那就是组长再派一单给 explorer。这条路成本不低，B-3 的验收只检查了"交接路径出现在前缀里"，没覆盖"经组长问"这半。</li>
+  <li><b>5. 临时工率（C-6）的分母没定义。</b>
+    第 4 张数据图的"新会话 28"里，混着"真正的新对象"和"专家忙时开的空白实例"，现在的台账分不开。C-6 要算"派给已有专家却空白开工"，前提是每一单都记下"开工时这个对象有没有已有专家、走的是哪条装载路径"。这需要先在台账里加记录，C-6 才算得出来。</li>
+  <li><b>6. 取消一单，会把整个专家归档。</b>
+    画第 6 张生命周期图时，"取消"这条线找不到落点：L-5 说 <code>seat_close</code> 关一个在跑的专家就是取消，而 L-2 说 <code>seat_close</code> 是归档。两者是同一个入口，所以现在取消一单在跑的活，专家本身也被关掉、从名录里消失了。专家和"一单"在台账里是同一行，这正是 10-01 评审说的"座位一个词扛了三件事"。取消要只作用于一单，就得把"一单"和"专家"在入口上分开。</li>
+</ul>
+
+</main>
+</body>
+</html>

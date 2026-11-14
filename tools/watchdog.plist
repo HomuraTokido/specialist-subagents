@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS counterpart of the Windows Startup entry (tools/watchdog.vbs). A template: tools/install-watchdog.sh
+  writes this machine's repository path, node and PATH into the placeholders and installs the result as
+  ~/Library/LaunchAgents/com.specialist-subagents.watchdog.plist. launchd starts tools/watchdog.mjs
+  at login and restarts it if it ever exits; the watchdog checks the port once a minute and starts the
+  daemon, detached, only when it is down, so the daemon lives outside any Claude Code or DSH process tree.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.specialist-subagents.watchdog</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__REPO__/tools/watchdog.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- launchd starts jobs with a bare PATH; seats find codex through `npm root -g`, so node's own
+         directory and npm's global bin are written in ahead of the system directories. -->
+    <key>PATH</key>
+    <string>__PATH__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__REPO__/.data/launchd.out</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO__/.data/launchd.out</string>
+</dict>
+</plist>

@@ -1,0 +1,15 @@
+# 运行状态（台账、日志、每次座位的输出文件）：这是这台机器的历史，不是源码
+.data/
+*.log
+node_modules/
+
+# 机器本地：角色运行时的实际路径（每台机器不同，不进仓库）
+.runtime.json
+
+# 机器本地：后台定时岗位（在哪个目录、多久跑一次；目录每台机器不同）
+.schedules.json
+
+# 机器本地：岗位墙用的代码字体（Maple Mono CN，每个字重约 18MB，太大不进仓库）。
+# 放法：从 https://github.com/subframe7536/maple-font/releases 下 MapleMono-CN 包，
+# 把 MapleMono-CN-Regular.ttf、MapleMono-CN-Medium.ttf 放进这个目录。没有它们时页面回落到系统等宽字体。
+assets/fonts/maple/*.ttf

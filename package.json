@@ -1,0 +1,36 @@
+{
+  "name": "specialist-subagents",
+  "version": "0.1.0",
+  "description": "Multi-backend subagent MCP orchestrator with persistent directory/domain seats and an optional evidence-gated skill-refinement loop.",
+  "type": "module",
+  "author": "朱鷺戸ほむら (Homura Tokido)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HomuraTokido/specialist-subagents.git"
+  },
+  "bin": {
+    "specialist-subagents": "./bin/specialist-subagents.mjs",
+    "specialist-subagents-demo": "./bin/demo.mjs"
+  },
+  "scripts": {
+    "start": "node ./bin/specialist-subagents.mjs start",
+    "stop": "node ./bin/specialist-subagents.mjs stop",
+    "status": "node ./bin/specialist-subagents.mjs status",
+    "mcp": "node ./bin/specialist-subagents.mjs mcp",
+    "demo": "node ./bin/demo.mjs",
+    "test": "node src/role-contract.mjs && node --test \"tests/scenarios/*.scenario.mjs\" && node --test --test-concurrency=4 \"tests/**/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "mcp",
+    "subagent",
+    "multi-agent",
+    "claude-code",
+    "codex",
+    "gemini",
+    "skills"
+  ]
+}

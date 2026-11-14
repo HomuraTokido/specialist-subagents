@@ -1,0 +1,22 @@
+{
+  "order": ["codex", "grok", "claude", "antigravity", "deepseek"],
+  "levels": {
+    "codex":    { "standard": { "model": "gpt-6.1-sol",    "effort": "medium", "context_tokens": 272000 },  "max": { "model": "gpt-6.1-sol",    "effort": "xhigh", "context_tokens": 272000 } },
+    "grok":     { "standard": { "model": "grok-4.7",       "effort": "medium", "context_tokens": 256000 },  "max": { "model": "grok-4.7",       "effort": "xhigh", "context_tokens": 256000 } },
+    "claude":   { "standard": { "model": "sonnet",         "effort": null,     "context_tokens": 1000000 }, "max": { "model": "opus",           "effort": "high",  "context_tokens": 1000000 } },
+    "antigravity": { "standard": { "model": "gemini-4-hydrogen-medium", "effort": null, "context_tokens": 1000000 }, "max": { "model": "claude-opus-5-5-high", "effort": null, "context_tokens": 1000000 } },
+    "deepseek": { "standard": { "model": "deepseek-flash", "effort": null,     "context_tokens": 1000000 }, "max": { "model": "deepseek-flash", "effort": "high",  "context_tokens": 1000000 } }
+  },
+  "compact": { "codex": 784800, "claude": 1000000, "deepseek": 16384, "grok": 100 },
+  "best": {
+    "explorer":       { "kind": "codex",    "level": "standard" },
+    "coder":          { "kind": "codex",    "level": "standard" },
+    "tester":         { "kind": "codex",    "level": "standard" },
+    "handyman":       { "kind": "codex",    "level": "standard" },
+    "web_researcher": { "kind": "antigravity", "level": "standard" },
+    "librarian":      { "kind": "deepseek", "level": "standard" },
+    "refiner":        { "kind": "deepseek", "level": "standard" },
+    "leader":         { "kind": "claude",   "level": "max" }
+  },
+  "stay_standard": ["handyman"]
+}
