@@ -9,16 +9,29 @@ import { language, message } from './presets.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SUBSCRIPTION_COMMANDS = ['codex', 'claude', 'agy', 'grok'];
+const OVERRIDE_ENV = {
+  codex: 'SPECIALIST_CODEX_JS',
+  claude: 'SPECIALIST_CLAUDE_BIN',
+  grok: 'SPECIALIST_GROK_BIN',
+};
 
 function executableExists(command, env) {
+  if (env.SPECIALIST_NO_HOST_PATH === '1') return false;
   const result = spawnSync(process.platform === 'win32' ? 'where.exe' : 'which', [command], {
     env, stdio: 'ignore', windowsHide: true,
   });
   return result.status === 0;
 }
 
+function subscriptionExists(command, env) {
+  if (command === 'agy') return Boolean(resolveAgyBinary({ env }));
+  const pinned = OVERRIDE_ENV[command] ? env[OVERRIDE_ENV[command]]?.trim() : '';
+  if (pinned) return fs.existsSync(pinned);
+  return executableExists(command, env);
+}
+
 export function detectEnvironment({ env = process.env, runtimePath = resolveRuntime().runtime, commandExists } = {}) {
-  const exists = commandExists ?? ((command) => command === 'agy' ? Boolean(resolveAgyBinary({ env })) : executableExists(command, env));
+  const exists = commandExists ?? ((command) => subscriptionExists(command, env));
   return {
     subscriptionClis: SUBSCRIPTION_COMMANDS.filter((command) => exists(command)),
     piInstalled: fs.existsSync(runtimePath),
