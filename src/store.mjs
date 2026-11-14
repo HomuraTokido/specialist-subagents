@@ -1300,8 +1300,9 @@ export function normalizeFork(value, lang = language()) {
   throw err;
 }
 
-// The expert for (role, directory): the seat that last worked there and holds a session, if it is
-// free. A busy one is not waited for and not duplicated blank: a fork of it takes the task (openFork).
+// The expert for (role, directory): prefer a free seat with a session, then any free seat.
+// Expert identity does not depend on having a session file. A busy one is not waited for and not
+// duplicated blank: a fork of it takes the task (openFork).
 // Closed seats are retired and never come back; forks are never anyone's expert.
 //
 // 2026-10-11 (L-3): one directory may hold several experts separated by `topic`; the object is the
@@ -1344,7 +1345,7 @@ export function claimSeat({ role, cwd, owner = null, parent = null, topic = null
   if (fork && pool.length) {
     return openFork(pool.find((row) => row.session_file) ?? pool[0], { role, owner, fresh: fork === 'fresh', lang });
   }
-  const free = pool.find((row) => row.session_file && !isBusy(row));
+  const free = pool.find((row) => row.session_file && !isBusy(row)) ?? pool.find((row) => !isBusy(row));
   if (free) {
     const specRow = database.prepare('SELECT spec FROM roles WHERE id = ?').get(role);
     if (!specRow) throw new Error(`unknown role: ${role}`);
@@ -1436,8 +1437,9 @@ export function domainRoles() {
     .map((row) => row.id);
 }
 
-// The expert for (role, domain): the seat that last worked this domain and holds a session, if it is
-// free. The same reuse and fork-beside-a-busy-expert rules as claimSeat, but the key is the
+// The expert for (role, domain): prefer a free seat with a session, then any free seat.
+// Expert identity does not depend on having a session file. The same reuse and
+// fork-beside-a-busy-expert rules as claimSeat, but the key is the
 // domain text (already normalised by the caller), not a directory; the working directory is the
 // service's own, one per domain, and is passed in.
 export function claimDomainSeat({ role, domain, cwd = null, owner = null, parent = null, fork = null } = {}, lang = language()) {
@@ -1448,7 +1450,7 @@ export function claimDomainSeat({ role, domain, cwd = null, owner = null, parent
     .prepare("SELECT * FROM seats WHERE role = ? AND domain = ? AND state NOT IN ('closed') AND COALESCE(fork, 0) = 0 ORDER BY updated_at DESC")
     .all(role, domain);
   if (fork && rows.length) return openFork(rows.find((row) => row.session_file) ?? rows[0], { role, owner, fresh: fork === 'fresh', lang });
-  const free = rows.find((row) => row.session_file && !isBusy(row));
+  const free = rows.find((row) => row.session_file && !isBusy(row)) ?? rows.find((row) => !isBusy(row));
   if (free) {
     const specRow = database.prepare('SELECT spec FROM roles WHERE id = ?').get(role);
     if (!specRow) throw new Error(`unknown role: ${role}`);
