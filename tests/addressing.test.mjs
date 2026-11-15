@@ -63,6 +63,50 @@ function world() {
   return ctx;
 }
 
+describe('[E-3] reuse experts without a session file', () => {
+  const w = world();
+
+  for (const scenario of [
+    { name: 'a directory explorer', args: () => ({ role: 'explorer', cwd: w.dir('sessionless-directory') }) },
+    { name: 'a topic-scoped directory explorer', args: () => ({ role: 'explorer', cwd: w.dir('sessionless-topic'), topic: 'routing' }) },
+    { name: 'a domain web_researcher', args: () => ({ role: 'web_researcher', domain: 'sessionless-research' }) },
+  ]) {
+    it(`${scenario.name} keeps its identity through two failures and a successful retry`, async () => {
+      const args = scenario.args();
+      const first = await w.start({ ...args, task: 'fail-error' });
+      assert.equal(first.reused, false);
+      const failed = (await w.show(first.seat)).seat;
+      assert.equal(failed.state, 'failed');
+      assert.ok(!failed.session_file, 'the first failure leaves no session file');
+      assert.ok(failed.name, 'the new expert has a name');
+
+      const second = await w.start({ ...args, task: 'fail-error' });
+      assert.equal(second.seat, first.seat);
+      assert.equal(second.reused, true);
+      const retried = (await w.show(second.seat)).seat;
+      assert.equal(retried.state, 'failed');
+      assert.ok(!retried.session_file, 'the second failure still leaves no session file');
+      assert.equal(retried.name, failed.name);
+
+      const third = await w.start({ ...args, task: 'finish-after:10' });
+      assert.equal(third.seat, first.seat);
+      assert.equal(third.reused, true);
+      const finished = await w.show(third.seat);
+      assert.equal(finished.seat.state, 'done');
+      assert.ok(finished.seat.session_file, 'the successful retry saves a session file');
+      assert.equal(finished.seat.name, failed.name);
+      assert.equal(finished.events.filter((event) => event.kind === 'task').length, 3, 'all runs stay on the same expert');
+
+      const query = new URLSearchParams({ view: 'compact', role: args.role });
+      if (args.cwd) query.set('cwd', args.cwd);
+      if (args.domain) query.set('domain', args.domain);
+      const roster = await w.service.call('GET', `/seats?${query}`);
+      assert.equal(roster.status, 200);
+      assert.deepEqual(roster.json.map((row) => row.seat), [first.seat], 'the object has exactly one expert');
+    });
+  }
+});
+
 describe('[E-5] rename', () => {
   const w = world();
 
